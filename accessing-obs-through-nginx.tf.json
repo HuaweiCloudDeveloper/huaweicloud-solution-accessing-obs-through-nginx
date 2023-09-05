@@ -1,0 +1,212 @@
+{
+    "terraform": {
+        "required_providers": [
+            {
+                "huaweicloud": {
+                    "source": "huawei.com/provider/huaweicloud",
+                    "version": ">=1.40.1"
+                }
+            }
+        ]
+    },
+    "provider": {
+        "huaweicloud": {
+            "cloud": "myhuaweicloud.com",
+            "endpoints": {
+                "iam": "iam.ap-southeast-3.myhuaweicloud.com",
+                "dns": "dns.ap-southeast-3.myhuaweicloud.com",
+                "bss": "bss-intl.myhuaweicloud.com"
+            },
+            "insecure": true,
+            "region": "ap-southeast-3",
+            "auth_url": "https://iam.ap-southeast-3.myhuaweicloud.com/v3"
+        }
+    },
+    "variable": {
+        "vpc_name": {
+            "default": "accessing-obs-through-nginx-demo",
+            "description": "VPC name. It is newly created for this template and must be unique. The name can contain 1 to 55 characters, including letters, digits, underscores (_), hyphens (-), and periods (.). Default: accessing-obs-through-nginx-demo.",
+            "type": "string",
+            "nullable": "false",
+            "validation": {
+                "condition": "${length(regexall(\"^[\\\\w\\\\.-]{1,55}$\",var.vpc_name))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "secgroup_name": {
+            "default": "accessing-obs-through-nginx-demo",
+            "description": "Security group name. It is newly created for this template. The name can contain 1 to 64 characters, including letters, digits, underscores (_), hyphens (-), and periods (.). To configure security group rules, see the deployment guide. Default: accessing-obs-through-nginx-demo.",
+            "type": "string",
+            "nullable": "false",
+            "validation": {
+                "condition": "${length(regexall(\"^[\\\\w\\\\.-]{1,64}$\",var.secgroup_name))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "ecs_name": {
+            "default": "accessing-obs-through-nginx-demo",
+            "description": "ECS name in the {ecs_name}_ecs format. It must be unique and can contain 1 to 60 characters, including letters, digits, underscores (_), hyphens (-), and periods (.). Default: accessing-obs-through-nginx-demo.",
+            "type": "string",
+            "nullable": "false",
+            "validation": {
+                "condition": "${length(regexall(\"^[\\\\w\\\\.-]{1,60}$\",var.ecs_name))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "ecs_flavor": {
+            "default": "s6.medium.2",
+            "description": "ECS flavor. For more flavors, see the parameter description in the deployment guide. Default: s6.medium.2 (s6 | 1 vCPU | 2 GiB)..",
+            "type": "string",
+            "nullable": "false",
+            "validation": {
+                "condition": "${length(regexall(\"^([a-z][a-z0-9]{0,3}\\\\.)(small\\\\.|medium\\\\.|(x||[1-9][0-9]{0,1}x)large\\\\.)[1-9][0-9]{0,1}$\",var.ecs_flavor))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "ecs_password": {
+            "default": "",
+            "description": "ECS initial password. After an ECS is created, log in to the ECS console and change its initial password by referring to the deployment guide. The password can contain 8 to 26 characters, including at least three types of the following characters: uppercase letters, lowercase letters, digits, and special characters (!@$%^-_=+[{}]:,./?), and it cannot contain any username or the username spelled backwards. The administrator is root.",
+            "type": "string",
+            "nullable": "false",
+            "sensitive": "true"
+        },
+        "charging_mode": {
+            "default": "postPaid",
+            "description": "Billing mode. Value options: prePaid (yearly/monthly) or postPaid (pay-per-use). Default: postPaid",
+            "type": "string",
+            "nullable": "false",
+             "validation": {
+                "condition": "${contains([\"postPaid\",\"prePaid\"], var.charging_mode)}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "charging_unit": {
+            "default": "month",
+            "description": "Billing period unit, mandatory when charging_mode is set to prePaid. Value options: year or month. Default: month",
+            "type": "string",
+            "nullable": "false",
+              "validation": {
+                "condition": "${contains([\"month\",\"year\"], var.charging_unit)}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "charging_period": {
+            "default": 1,
+            "description": "Billing period, in the range of 1 to 3 when charging_unit is set to year and in the range of 1 to 9 when charging_unit is set to month. This parameter is mandatory when charging_mode is set to prePaid. Default value: 1",
+            "type": "number",
+            "nullable": "false",
+              "validation": {
+                "condition": "${length(regexall(\"^[1-9]$\",var.charging_period))>0}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "bandwidth_size": {
+            "default": 5,
+            "description": "EIP bandwidth size. This template uses billing by bandwidth in Mbit/s. Value range: 1 to 2,000. Default value: 5",
+            "type": "number",
+            "nullable": "false",
+               "validation": {
+                "condition": "${length(regexall(\"^(1[0-9]{3}|[1-9][0-9]{0,2}|2000)$\",var.bandwidth_size))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "access_domain_name": {
+            "default": "",
+            "description": "Access domain name of the OBS bucket you want to configure a proxy for. To obtain it, see the deployment guide.",
+            "type": "string",
+            "nullable": "false"
+        }
+    },
+    "data": {
+        "huaweicloud_availability_zones": {
+            "availability_zones": {}
+        },
+        "huaweicloud_images_image": {
+            "CentOS": {
+                "most_recent": true,
+                "name": "CentOS 7.6 64bit",
+                "visibility": "public"
+            }
+        }
+    },
+    "resource": {
+        "huaweicloud_vpc": {
+            "vpc": {
+                "name": "${var.vpc_name}",
+                "cidr": "172.16.0.0/24"
+            }
+        },
+        "huaweicloud_vpc_subnet": {
+            "subnet": {
+                "name": "${var.vpc_name}-subnet",
+                "cidr": "${huaweicloud_vpc.vpc.cidr}",
+                "vpc_id": "${huaweicloud_vpc.vpc.id}",
+                "gateway_ip": "172.16.0.1"
+            }
+        },
+        "huaweicloud_networking_secgroup": {
+            "security_group": {
+                "name": "${var.secgroup_name}"
+            }
+        },
+        "huaweicloud_networking_secgroup_rule": {
+            "allow_ping": {
+                "description": "Allows to test the ECS connectivity with the ping command.",
+                "direction": "ingress",
+                "ethertype": "IPv4",
+                "protocol": "icmp",
+                "remote_ip_prefix": "0.0.0.0/0",
+                "security_group_id": "${huaweicloud_networking_secgroup.security_group.id}"
+            },
+            "allow_all": {
+                "description": "Port of the Nginx server",
+                "direction": "ingress",
+                "ethertype": "IPv4",
+                "ports": 80,
+                "protocol": "tcp",
+                "remote_ip_prefix": "0.0.0.0/0",
+                "security_group_id": "${huaweicloud_networking_secgroup.security_group.id}"
+            }
+        },
+        "huaweicloud_vpc_eip": {
+            "eip": {
+                "name": "${var.vpc_name}-eip",
+                "bandwidth": {
+                    "name": "${var.vpc_name}-bandwith",
+                    "share_type": "PER",
+                    "size": "${var.bandwidth_size}",
+                    "charge_mode": "bandwidth"
+                },
+                "publicip": {
+                    "type": "5_bgp"
+                },
+                "charging_mode": "${var.charging_mode}",
+                "period_unit": "${var.charging_unit}",
+                "period": "${var.charging_period}"
+            }
+        },
+        "huaweicloud_compute_instance": {
+            "instance": {
+                "name": "${var.ecs_name}_ecs",
+                "image_id": "${data.huaweicloud_images_image.CentOS.id}",
+                "flavor_id": "${var.ecs_flavor}",
+                "security_group_ids": [
+                    "${huaweicloud_networking_secgroup.security_group.id}"
+                ],
+                "availability_zone": "${data.huaweicloud_availability_zones.availability_zones.names[0]}",
+                "system_disk_type": "SAS",
+                "system_disk_size": 100,
+                "charging_mode": "${var.charging_mode}",
+                "period_unit": "${var.charging_unit}",
+                "period": "${var.charging_period}",
+                "admin_pass": "${var.ecs_password}",
+                "eip_id": "${huaweicloud_vpc_eip.eip.id}",
+                "agent_list": "ces,hss",
+                "network": {
+                    "uuid": "${huaweicloud_vpc_subnet.subnet.id}"
+                },
+                "user_data": "#!/bin/bash\necho 'root:${var.ecs_password}' | chpasswd\nwget -P /tmp/ https://documentation-samples.obs.cn-north-4.myhuaweicloud.com/solution-as-code-publicbucket/solution-as-code-moudle/accessing-obs-through-nginx/userdata/install_nginx.sh\nchmod 744 /tmp/install_nginx.sh\nsh /tmp/install_nginx.sh ${huaweicloud_vpc_eip.eip.address} https://${var.access_domain_name}\nrm -rf /tmp/install_nginx.sh"
+            }
+        }
+    }
+}
